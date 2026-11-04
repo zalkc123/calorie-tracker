@@ -9,6 +9,7 @@ Een eenvoudige calorieën-tracker in één enkel HTML-bestand. Werkt volledig of
 
 ## Functies
 
+- **Automatische caloriewaarden**: terwijl je typt krijg je suggesties uit een ingebouwde voedingsmiddelendatabase (per standaardportie) en wordt de kcal-waarde automatisch gevuld
 - **Dagelijkse calorie-invoer** per maaltijd (ontbijt, lunch, diner, snack)
 - **Dagdoel instellen** met voortgangsbalk en resterende calorieën
 - **Navigeren tussen dagen** (vandaag, gisteren, en eerder)

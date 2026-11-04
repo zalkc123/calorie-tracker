@@ -111,6 +111,22 @@
   }
   .export-row button:hover { background: var(--accent-soft); }
 
+  .food-wrap { position: relative; flex: 2 1 160px; }
+  .food-wrap input { width: 100%; }
+  ul.suggestions {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; list-style: none; max-height: 220px; overflow-y: auto;
+    z-index: 10; box-shadow: 0 4px 12px rgba(30,42,56,.12);
+  }
+  ul.suggestions li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 12px; cursor: pointer; font-size: .95rem;
+  }
+  ul.suggestions li:hover, ul.suggestions li.active { background: var(--accent-soft); }
+  ul.suggestions .s-kcal { color: var(--muted); font-size: .85rem; white-space: nowrap; margin-left: 12px; }
+  ul.suggestions .no-match { color: var(--muted); cursor: default; }
+
   footer { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 24px; }
 </style>
 </head>
@@ -137,7 +153,10 @@
 
   <div class="card">
     <form class="add-form" id="addForm">
-      <input type="text" id="foodInput" placeholder="Wat heb je gegeten?" autocomplete="off" required>
+      <div class="food-wrap">
+        <input type="text" id="foodInput" placeholder="Wat heb je gegeten? (typ voor suggesties)" autocomplete="off" required>
+        <ul class="suggestions" id="suggestions" hidden></ul>
+      </div>
       <input type="number" id="kcalInput" placeholder="kcal" min="0" max="5000" required>
       <select id="mealSelect">
         <option value="Ontbijt">Ontbijt</option>
@@ -179,6 +198,80 @@
   const STORE_KEY = "calorieTracker.data.v1";
   const GOAL_KEY = "calorieTracker.goal.v1";
   const MEALS = ["Ontbijt", "Lunch", "Diner", "Snack"];
+
+  // kcal per standaardportie
+  const FOODS = [
+    { name: "Boterham kaas", kcal: 120 },
+        { name: "Boterham hagelslag", kcal: 140 },
+    { name: "Boterham jam", kcal: 110 }, { name: "Boterham pindakaas", kcal: 160 },
+    { name: "Boterham rosbief", kcal: 120 }, { name: "Tosti ham-kaas", kcal: 350 },
+    { name: "Uitsmijter (2 eieren)", kcal: 450 }, { name: "Ei gekookt", kcal: 80 },
+    { name: "Bospaddenstoelen-omelet", kcal: 220 }, { name: "Omelet (2 eieren)", kcal: 220 },
+    { name: "Gebakken ei", kcal: 110 }, { name: "Rozijnenbol", kcal: 250 },
+    { name: "Croissant", kcal: 270 }, { name: "Krentenbol", kcal: 230 },
+    { name: "Cracker met kaas", kcal: 90 }, { name: "Bowl van yoghurt met fruit", kcal: 250 },
+    { name: "Kwark (magere)", kcal: 100 }, { name: "Griekse yoghurt (150g)", kcal: 150 },
+    { name: "Muesli met melk (kom)", kcal: 350 }, { name: "Cornflakes met melk", kcal: 250 },
+    { name: "Volkorenboterham met kaas", kcal: 120 }, { name: "Pap (brinta)", kcal: 250 },
+    { name: "Banaan", kcal: 100 }, { name: "Appel", kcal: 80 },
+    { name: "Sinaasappel", kcal: 70 }, { name: "Druiven (handje)", kcal: 70 },
+    { name: "Aardbeien (kom, 150g)", kcal: 70 }, { name: "Blauwe bessen (handje)", kcal: 55 },
+    { name: "Fruit smoothie (glas)", kcal: 150 }, { name: "Sinasappelsap (glas)", kcal: 110 },
+    { name: "Appelsap (glas)", kcal: 110 }, { name: "Melk halfvol (glas)", kcal: 115 },
+    { name: "Chocolademelk (glas)", kcal: 180 }, { name: "Koffie zwart", kcal: 5 },
+    { name: "Koffie met melk/suiker", kcal: 40 }, { name: "Thee", kcal: 2 },
+    { name: "Cola (glas)", kcal: 105 }, { name: "Cola light (glas)", kcal: 0 },
+    { name: "Water (glas)", kcal: 0 }, { name: "Bier (glas)", kcal: 110 },
+    { name: "Wijn rood (glas)", kcal: 85 }, { name: "Wijn wit (glas)", kcal: 85 },
+    { name: "Tomatensoep (kom)", kcal: 130 }, { name: "Erwtensoep (kom)", kcal: 280 },
+    { name: "Groentesoep (kom)", kcal: 120 }, { name: "Pasta bolognese (portie)", kcal: 550 },
+    { name: "Pasta carbonara (portie)", kcal: 650 }, { name: "Pasta pesto (portie)", kcal: 580 },
+    { name: "Macaroni met kaas (portie)", kcal: 600 }, { name: "Lasagne (portie)", kcal: 650 },
+    { name: "Pizza margherita (½)", kcal: 450 }, { name: "Pizza salami (½)", kcal: 550 },
+    { name: "Rijst (portie, gekookt)", kcal: 250 }, { name: "Nasi/bami (portie)", kcal: 500 },
+    { name: "Gebakken aardappelen (3)", kcal: 300 }, { name: "Aardappelen gekookt (3)", kcal: 210 },
+    { name: "Friet middel", kcal: 350 }, { name: "Frietsaus (bakje)", kcal: 120 },
+    { name: "Frikandel", kcal: 180 }, { name: "Kroket", kcal: 220 },
+    { name: "Bami schijf", kcal: 180 }, { name: "Frikandel speciaal", kcal: 240 },
+    { name: "Hamburger (fastfood menu)", kcal: 800 }, { name: "Hamburger (alleen)", kcal: 250 },
+    { name: "Cheeseburger", kcal: 300 }, { name: "Big Mac", kcal: 500 },
+    { name: "Kapsalon", kcal: 1100 }, { name: "Shoarma broodje", kcal: 600 },
+    { name: "Broodje falafel", kcal: 450 }, { name: "Broodje kroket", kcal: 375 },
+    { name: "Broodje warme worst", kcal: 350 }, { name: "Broodje gezond", kcal: 350 },
+    { name: "Broodje kip kerrie", kcal: 400 }, { name: "Wrap kip", kcal: 450 },
+    { name: "Caesar salad", kcal: 450 }, { name: "Groene salade met kip", kcal: 350 },
+    { name: "Zalmsalade", kcal: 300 }, { name: "Biefstuk (150g)", kcal: 300 },
+    { name: "Kipfilet gebakken (150g)", kcal: 250 }, { name: "Kipspies", kcal: 200 },
+    { name: "Gebakken vis (portie)", kcal: 300 }, { name: "Zalm (150g)", kcal: 300 },
+    { name: "Garnalen (150g)", kcal: 150 }, { name: "Schnitzel", kcal: 400 },
+    { name: "Gehaktbal", kcal: 200 },
+    { name: "Gehaktballetjes in tomatensaus", kcal: 320 }, { name: "Stampot (portie)", kcal: 400 },
+    { name: "Spinazie met aardappelen", kcal: 300 }, { name: "Rode bieten", kcal: 50 },
+    { name: "Broccoli (portie)", kcal: 40 }, { name: "Wortelen (portie)", kcal: 40 },
+    { name: "Erwten en wortelen", kcal: 100 }, { name: "Witte kool stamppot", kcal: 250 },
+    { name: "Hutspot (portie)", kcal: 350 }, { name: "Zuurkool stamppot", kcal: 350 },
+    { name: "Roerbak met kip en groente", kcal: 450 }, { name: "Roerbak met tofu", kcal: 350 },
+    { name: "Vegetarische burger", kcal: 220 }, { name: "Vega gehaktbal", kcal: 180 },
+    { name: "Bloemkool met kaassaus", kcal: 350 }, { name: "Gekookte ham (plak)", kcal: 30 },
+    { name: "Kaasblokjes (50g)", kcal: 160 }, { name: "Yoghurt drink (flesje)", kcal: 130 },
+    { name: "Chocolade reep", kcal: 230 }, { name: "Mars/Snickers", kcal: 250 },
+    { name: "KitKat", kcal: 210 }, { name: "Drop (handje)", kcal: 90 },
+    { name: "Chips (bakje)", kcal: 160 }, { name: "Nootjes (handje)", kcal: 100 },
+    { name: "Koekjes (2)", kcal: 120 }, { name: "Oreo (2)", kcal: 110 },
+    { name: "Wafel", kcal: 150 }, { name: "Appelgebak (punt)", kcal: 310 },
+    { name: "Worteltaart (punt)", kcal: 350 }, { name: "Chocoladekoekjes (3)", kcal: 180 },
+    { name: "Ijsje (magnum)", kcal: 250 }, { name: "IJscoupe (2 bollen)", kcal: 230 },
+    { name: "Brownie (punt)", kcal: 300 }, { name: "Donut", kcal: 280 },
+    { name: "Muffin", kcal: 350 }, { name: "Croissant met kaas", kcal: 340 },
+    { name: "Gewone yoghurt met granola", kcal: 250 }, { name: "Proteïnereep", kcal: 200 },
+    { name: "Frietje oorlog", kcal: 500 }, { name: "Nacho's met kaas", kcal: 550 },
+    { name: "Zelfgemaakte pizza margherita (punt)", kcal: 250 }, { name: "Dieetproduct shake", kcal: 200 },
+    { name: "Lente soep", kcal: 110 }, { name: "Kippensoep (kom)", kcal: 130 },
+    { name: "Vleeswaren salade", kcal: 250 }, { name: "Vegan bowl", kcal: 450 },
+    { name: "Poke bowl", kcal: 500 }, { name: "Sushi (8 stuks)", kcal: 300 },
+    { name: "Sushi (kom)", kcal: 600 }, { name: "Loempia", kcal: 200 }
+  ].sort(function (a, b) { return a.name.localeCompare(b.name, "nl"); });
+
 
   let entries = load(STORE_KEY, {});
   let goal = parseInt(load(GOAL_KEY, "2000"), 10) || 2000;
@@ -325,10 +418,99 @@
     render();
   }
 
+  const foodInputEl = document.getElementById("foodInput");
+  const suggestionsEl = document.getElementById("suggestions");
+  const kcalInputEl = document.getElementById("kcalInput");
+  let activeIndex = -1;
+
+  function hideSuggestions() {
+    suggestionsEl.hidden = true;
+    suggestionsEl.innerHTML = "";
+    activeIndex = -1;
+  }
+
+  function highlightActive() {
+    const items = suggestionsEl.querySelectorAll("li[data-idx]");
+    items.forEach(function (li, i) {
+      li.classList.toggle("active", i === activeIndex);
+    });
+  }
+
+  function pickSuggestion(idx) {
+    const items = suggestionsEl.querySelectorAll("li[data-idx]");
+    const li = items[idx];
+    if (!li) return;
+    foodInputEl.value = li.dataset.name;
+    kcalInputEl.value = li.dataset.kcal;
+    hideSuggestions();
+    kcalInputEl.focus();
+  }
+
+  function showSuggestions() {
+    const q = foodInputEl.value.trim().toLowerCase();
+    if (q.length < 2) {
+      hideSuggestions();
+      return;
+    }
+    const matches = [];
+    for (const f of FOODS) {
+      const n = f.name.toLowerCase();
+      if (n.indexOf(q) !== -1) {
+        matches.push({ start: n.indexOf(q), f: f });
+        if (matches.length >= 40) break;
+      }
+    }
+    matches.sort(function (a, b) { return a.start - b.start; });
+    const top = matches.slice(0, 8).map(function (m) { return m.f; });
+    if (!top.length) {
+      hideSuggestions();
+      return;
+    }
+    let html = "";
+    top.forEach(function (f, i) {
+      html += "<li data-idx='" + i + "' data-name='" + escapeHtml(f.name) + "' data-kcal='" + f.kcal + "'>" +
+        "<span>" + escapeHtml(f.name) + "</span><span class='s-kcal'>" +
+        f.kcal.toLocaleString("nl-NL") + " kcal</span></li>";
+    });
+    suggestionsEl.innerHTML = html;
+    suggestionsEl.hidden = false;
+    activeIndex = -1;
+
+    suggestionsEl.querySelectorAll("li[data-idx]").forEach(function (li) {
+      li.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        pickSuggestion(Number(this.dataset.idx));
+      });
+    });
+  }
+
+  foodInputEl.addEventListener("input", showSuggestions);
+  foodInputEl.addEventListener("blur", function () {
+    setTimeout(hideSuggestions, 150);
+  });
+  foodInputEl.addEventListener("keydown", function (e) {
+    if (suggestionsEl.hidden) return;
+    const count = suggestionsEl.querySelectorAll("li[data-idx]").length;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      activeIndex = (activeIndex + 1) % count;
+      highlightActive();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      activeIndex = activeIndex <= 0 ? count - 1 : activeIndex - 1;
+      highlightActive();
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      pickSuggestion(activeIndex);
+    } else if (e.key === "Escape") {
+      hideSuggestions();
+    }
+  });
+
   document.getElementById("addForm").addEventListener("submit", function (e) {
     e.preventDefault();
     const food = document.getElementById("foodInput").value.trim();
-    const kcal = parseInt(document.getElementById("kcalInput").value, 10);
+    const kcal = parseInt(kcalInputEl.value, 10);
     const meal = document.getElementById("mealSelect").value;
     if (!food || isNaN(kcal) || kcal < 0) return;
     addEntry(food, kcal, meal);
